@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <title>文件接收(仿微信)</title>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <style>
+    /* 仿微信文件接收卡片样式 */
+    .wechat-file-card {
+      width: 300px;
+      padding: 15px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      margin: 50px auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .file-icon {
+      width: 40px;
+      height: 40px;
+      background: #07C160;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      color: white;
+      font-weight: bold;
+    }
+
+    .file-info {
+      flex: 1;
+    }
+
+    .download-btn {
+      padding: 6px 12px;
+      background: #07C160;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="fileCard" class="wechat-file-card" style="display: none;">
+    <div class="file-icon">简历</div>
+    <div class="file-info">
+      <div id="fileName" style="font-weight: 500;"></div>
+    </div>
+    <button class="download-btn" onclick="downloadFile()">下载</button>
+  </div>
+
+  <script>
+    // 后端文件名称（替换成你要下载的文件）
+    const targetFileName = "简历.pdf";
+
+    // 页面加载 → 自动弹出文件卡片（仿微信接收）
+    window.onload = function () {
+      document.getElementById("fileName").innerText = targetFileName;
+      document.getElementById("fileCard").style.display = "flex";
+    };
+
+    // 点击下载核心方法
+    function downloadFile() {
+      // 请求后端，必须设置 responseType: 'blob'
+      axios({
+        url: `http://localhost:8008/download/${targetFileName}`,
+        method: 'GET',
+        responseType: 'blob' // 关键：接收二进制文件流
+      }).then(res => {
+        // 创建下载链接
+        const blob = new Blob([res.data]);
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = targetFileName; // 文件名
+        document.body.appendChild(a);
+        a.click(); // 自动点击下载
+        // 释放内存
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        alert("下载完成！");
+      }).catch(err => {
+        alert("文件下载失败");
+      });
+    }
+  </script>
+</body>
+
+</html>

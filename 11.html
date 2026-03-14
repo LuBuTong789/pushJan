@@ -1,0 +1,67 @@
+<template>
+  <!-- 仿微信文件卡片 -->
+  <div class="wechat-file-card" v-if="showFile">
+    <div class="file-icon">文件</div>
+    <div class="file-info">{{ fileName }}</div>
+    <button @click="downloadFile" class="download-btn">下载</button>
+  </div>
+</template>
+
+<script setup>
+  import axios from 'axios'
+  import { ref } from 'vue'
+
+  const fileName = ref("测试文档.pdf")
+  const showFile = ref(true)
+
+  // 下载文件
+  const downloadFile = async () => {
+    try {
+      const res = await axios.get(`/download/${fileName.value}`, {
+        responseType: 'blob'
+      })
+      const url = window.URL.createObjectURL(new Blob([res.data]))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName.value
+      a.click()
+      window.URL.revokeObjectURL(url)
+    } catch (e) {
+      alert('下载失败')
+    }
+  }
+</script>
+
+<style scoped>
+  /* 样式同上 */
+  .wechat-file-card {
+    width: 300px;
+    padding: 15px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 50px auto;
+  }
+
+  .file-icon {
+    width: 40px;
+    height: 40px;
+    background: #07C160;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    color: white;
+  }
+
+  .download-btn {
+    padding: 6px 12px;
+    background: #07C160;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+</style>
