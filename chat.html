@@ -549,155 +549,137 @@
 </body>
 
 <script>
-  // 页面打开自动执行，直接调用
+  // 页面打开自动执行登录校验
   checkLogin()
   function checkLogin() {
     const token = localStorage.getItem('authToken')
     if (!token) location.href = 'index.html'
   }
+
   // 获取DOM元素
-  const messagesContainer = document.getElementById('messages'); // 聊天消息容器
-  const chatForm = document.getElementById('chatForm'); // 聊天表单
-  const messageInput = document.getElementById('messageInput'); // 消息输入框
-  const sendBtn = document.getElementById('sendBtn'); // 发送按钮
+  const messagesContainer = document.getElementById('messages');
+  const chatForm = document.getElementById('chatForm');
+  const messageInput = document.getElementById('messageInput');
+  const sendBtn = document.getElementById('sendBtn');
+  // 全局保存SSE对象，防止重复连接
+  let eventSource = null;
 
-  // AI预设回复列表
-  const aiResponses = [
-    '我理解您的意思，让我为您详细解答...',
-    '这是一个很好的问题！根据我的分析...',
-    '收到！我已经记录了您的需求。',
-    '从专业角度来看，我建议您考虑以下几个方面...',
-    '没问题，我可以帮您处理这个任务。',
-    '感谢您的提问，让我查询一下相关信息...',
-    '根据最新数据，答案是肯定的。',
-    '我需要更多信息来给出准确的建议。'
-  ];
+  // 转义HTML，防止XSS
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
 
-  // 向聊天窗口添加消息
+  // 滚动到底部
+  function scrollToBottom() {
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+
+  // 添加消息到窗口
   function addMessage(text, isUser = false) {
-    // 如果存在欢迎消息则移除
-    const welcome = messagesContainer.querySelector('.welcome');
-    if (welcome) welcome.remove();
+    // 修复：选择器错误（注释掉或改成正确类名）
+    // const welcome = messagesContainer.querySelector('.welcome');
+    // if (welcome) welcome.remove();
 
-    // 创建消息容器div
     const messageDiv = document.createElement('div');
-    // 为消息容器添加类名，区分用户/AI消息
     messageDiv.className = `message ${isUser ? 'message-user' : 'message-ai'}`;
-
-    // 获取当前时间（格式化为中文时分格式）
-    const time = new Date().toLocaleTimeString('zh-CN', {
-      hour: '2-digit', // 两位数小时
-      minute: '2-digit' // 两位数分钟
-    });
-
-    // 构建消息DOM结构（包含气泡和时间）
+    const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
     messageDiv.innerHTML = `
-                <div class="bubble ${isUser ? 'bubble-user' : 'bubble-ai'}">
-                    ${escapeHtml(text)}
-                </div>
-                <div class="time">${time}</div>
-            `;
-
-    // 将消息添加到容器中
+      <div class="bubble ${isUser ? 'bubble-user' : 'bubble-ai'}">${escapeHtml(text)}</div>
+      <div class="time">${time}</div>
+    `;
     messagesContainer.appendChild(messageDiv);
-    // 滚动到聊天底部
     scrollToBottom();
   }
 
-  function sendMsg() {
-    // 获取用户输入的消息
-    const message = document.getElementById('messageInput').value;
-    if (message == "") return false;
-    messagesDiv.innerHTML = '';
-
-    //1 客户端使用 JavaScript 的 EventSource 对象连接到服务器上的一个特定端点（URL）
-    const eventSource = new EventSource('stream/deepseekclient?question=' + message);
-    //2 监听消息事件
-    eventSource.onmessage = function (event) {
-      // 获取流式返回的数据
-      const data = event.data;
-      // 将接收到的数据展示到页面上
-      const messagesDiv = document.getElementById('messages');
-      messagesDiv.innerHTML += event.data;
-    };
-
-    //3 监听错误事件
-    eventSource.onerror = function (error) {
-      console.error('EventSource 发生错误：', error);
-      eventSource.close(); // 关闭连接
-    };
-  }
-
-  // 显示AI正在输入的提示（打字动效）
+  // 显示AI输入中
   function showTyping() {
+    const typing = document.getElementById('typingIndicator');
+    if (typing) return; // 防止重复创建
+
     const typingDiv = document.createElement('div');
     typingDiv.className = 'message message-ai';
-    typingDiv.id = 'typingIndicator'; // 唯一标识，方便后续移除
+    typingDiv.id = 'typingIndicator';
     typingDiv.innerHTML = `
-                <div class="bubble bubble-ai typing">
-                    <div class="typing-dot"></div>
-                    <div class="typing-dot"></div>
-                    <div class="typing-dot"></div>
-                </div>
-            `;
+      <div class="bubble bubble-ai typing">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      </div>
+    `;
     messagesContainer.appendChild(typingDiv);
     scrollToBottom();
   }
 
-  // 隐藏AI正在输入的提示
+  // 隐藏AI输入中
   function hideTyping() {
     const typing = document.getElementById('typingIndicator');
     if (typing) typing.remove();
   }
 
+  // 核心：发送消息 + SSE连接
+  function sendMessage(message) {
+    // 1. 先添加用户消息
+    addMessage(message, true);
 
-
-
-  // 滚动聊天窗口到底部（显示最新消息）
-  function scrollToBottom() {
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-  }
-
-  // HTML转义（防止XSS攻击，安全处理用户输入）
-  function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text; // 利用textContent自动转义特殊字符
-    return div.innerHTML; // 返回转义后的HTML字符串
-  }
-
-  // 处理表单提交（发送消息）
-  chatForm.addEventListener('submit', async (e) => {
-    e.preventDefault(); // 阻止表单默认提交行为
-    const text = messageInput.value.trim(); // 获取并去除输入内容的首尾空格
-    if (!text) return; // 如果输入为空，直接返回
-
-    // 添加用户消息到聊天窗口
-    addMessage(text, true);
-    // 清空输入框
-    messageInput.value = '';
-    // 禁用发送按钮（防止重复提交）
-    sendBtn.disabled = true;
-
-    // 显示AI正在输入的提示
+    // 2. 显示AI输入中
     showTyping();
 
-    // 模拟网络延迟（1-2秒随机延迟，提升真实感）
-    await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
+    // 3. 关闭旧的SSE连接
+    if (eventSource) {
+      eventSource.close();
+    }
 
-    // 隐藏输入提示
-    hideTyping();
+    // 4. 建立新SSE
+    const url = `http://localhost:8009/stream/deepseekclient?question=${encodeURIComponent(message)}`;
+    eventSource = new EventSource(url);
 
-    // 随机选择一条AI回复并添加到聊天窗口
-    const response = aiResponses[Math.floor(Math.random() * aiResponses.length)];
-    addMessage(response, false);
+    // 5. 接收流式数据
+    eventSource.onmessage = function (event) {
+      hideTyping(); // 收到第一条数据就隐藏输入提示
+      // 找到最后一个AI消息，追加内容
+      const lastAiMsg = messagesContainer.querySelector('.message-ai:last-child .bubble');
+      if (lastAiMsg) {
+        lastAiMsg.innerHTML += escapeHtml(event.data);
+      } else {
+        // 没有就新建
+        addMessage(event.data, false);
+      }
+      scrollToBottom();
+    };
 
-    // 恢复发送按钮可用状态
-    sendBtn.disabled = false;
-    // 让输入框重新获得焦点（方便继续输入）
+    // 6. 错误/完成处理
+    eventSource.onerror = function () {
+      eventSource.close();
+      hideTyping();
+      sendBtn.disabled = false;
+    };
+
+    // 7. SSE结束关闭连接
+    eventSource.onclose = function () {
+      eventSource.close();
+      sendBtn.disabled = false;
+    };
+  }
+
+  // 表单提交处理
+  chatForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const text = messageInput.value.trim();
+    if (!text || sendBtn.disabled) return;
+
+    // 发送消息
+    sendMessage(text);
+
+    // 清空输入框
+    messageInput.value = '';
+    // 禁用按钮防止重复发送
+    sendBtn.disabled = true;
     messageInput.focus();
   });
 
-  // 页面加载后，自动让输入框获得焦点
+  // 页面加载聚焦
   messageInput.focus();
 </script>
 
